@@ -135,6 +135,8 @@ namespace EventStore.Core {
 
 		private bool _gossipOnSingleNode;
 
+		private bool _readOnlyReplica;
+
 		// ReSharper restore FieldCanBeMadeReadOnly.Local
 
 		protected VNodeBuilder() {
@@ -227,6 +229,8 @@ namespace EventStore.Core {
 			_faultOutOfOrderProjections = Opts.FaultOutOfOrderProjectionsDefault;
 			_reduceFileCachePressure = Opts.ReduceFileCachePressureDefault;
 			_initializationThreads = Opts.InitializationThreadsDefault;
+
+			_readOnlyReplica = Opts.ReadOnlyReplicaDefault;
 		}
 
 		protected VNodeBuilder WithSingleNodeSettings() {
@@ -1199,6 +1203,16 @@ namespace EventStore.Core {
 			return this;
 		}
 
+		/// <summary>
+		/// Sets this node as a read only replica that is not allowed to participate in elections.
+		/// </summary>
+		/// <returns></returns>
+		public VNodeBuilder EnableReadOnlyReplica() {
+			_readOnlyReplica = true;
+
+			return this;
+		}
+
 		private void EnsureHttpPrefixes() {
 			if (_intHttpPrefixes == null || _intHttpPrefixes.IsEmpty())
 				_intHttpPrefixes = new List<string>();
@@ -1393,7 +1407,8 @@ namespace EventStore.Core {
 				_faultOutOfOrderProjections,
 				_structuredLog,
 				_maxAutoMergeIndexLevel,
-				_disableFirstLevelHttpAuthorization);
+				_disableFirstLevelHttpAuthorization,
+				_readOnlyReplica);
 
 			var infoController = new InfoController(options, _projectionType);
 

@@ -102,7 +102,8 @@ namespace EventStore.Core.Services.Replication {
 				}
 				case VNodeState.CatchingUp:
 				case VNodeState.Clone:
-				case VNodeState.Slave: {
+				case VNodeState.Slave:
+				case VNodeState.ReadOnlyReplica:  {
 					// nothing changed, essentially
 					break;
 				}
@@ -188,7 +189,7 @@ namespace EventStore.Core.Services.Replication {
 			SendTcpMessage(_connection,
 				new ReplicationMessage.SubscribeReplica(
 					logPosition, chunk.ChunkHeader.ChunkId, epochs, _nodeInfo.InternalTcp,
-					message.MasterId, message.SubscriptionId, isPromotable: true));
+					message.MasterId, message.SubscriptionId, isPromotable: !_nodeInfo.IsReadOnlyReplica));
 		}
 
 		public void Handle(ReplicationMessage.AckLogPosition message) {
@@ -221,7 +222,8 @@ namespace EventStore.Core.Services.Replication {
 
 				case VNodeState.CatchingUp:
 				case VNodeState.Clone:
-				case VNodeState.Slave: {
+				case VNodeState.Slave:
+				case VNodeState.ReadOnlyReplica:  {
 					Debug.Assert(_connection != null, "Connection manager is null in slave/clone/catching up state");
 					SendTcpMessage(_connection, message.Message);
 					break;

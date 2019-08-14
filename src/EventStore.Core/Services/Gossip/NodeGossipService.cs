@@ -56,7 +56,8 @@ namespace EventStore.Core.Services.Gossip {
 				lastEpoch == null ? -1 : lastEpoch.EpochPosition,
 				lastEpoch == null ? -1 : lastEpoch.EpochNumber,
 				lastEpoch == null ? Guid.Empty : lastEpoch.EpochId,
-				_nodePriority);
+				_nodePriority,
+				NodeInfo.IsReadOnlyReplica);
 		}
 
 		protected override MemberInfo GetUpdatedMe(MemberInfo me) {
