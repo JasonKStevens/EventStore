@@ -102,8 +102,7 @@ namespace EventStore.Core.Services {
 					nodeInfo.ExternalTcp, nodeInfo.ExternalSecureTcp,
 					nodeInfo.InternalHttp, nodeInfo.ExternalHttp,
 					ownInfo.LastCommitPosition, ownInfo.WriterCheckpoint, ownInfo.ChaserCheckpoint,
-					ownInfo.EpochPosition, ownInfo.EpochNumber, ownInfo.EpochId, ownInfo.NodePriority,
-					nodeInfo.IsReadOnlyReplica)
+					ownInfo.EpochPosition, ownInfo.EpochNumber, ownInfo.EpochId, ownInfo.NodePriority)
 			};
 		}
 

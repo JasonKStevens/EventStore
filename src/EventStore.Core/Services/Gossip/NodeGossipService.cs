@@ -40,9 +40,11 @@ namespace EventStore.Core.Services.Gossip {
 
 		protected override MemberInfo GetInitialMe() {
 			var lastEpoch = _epochManager.GetLastEpoch();
+			var initialState = NodeInfo.IsReadOnlyReplica ?
+				VNodeState.ReadOnlyUnknown : VNodeState.Unknown;
 			return MemberInfo.ForVNode(NodeInfo.InstanceId,
 				DateTime.UtcNow,
-				VNodeState.Unknown,
+				initialState,
 				true,
 				NodeInfo.InternalTcp,
 				NodeInfo.InternalSecureTcp,
@@ -56,8 +58,7 @@ namespace EventStore.Core.Services.Gossip {
 				lastEpoch == null ? -1 : lastEpoch.EpochPosition,
 				lastEpoch == null ? -1 : lastEpoch.EpochNumber,
 				lastEpoch == null ? Guid.Empty : lastEpoch.EpochId,
-				_nodePriority,
-				NodeInfo.IsReadOnlyReplica);
+				_nodePriority);
 		}
 
 		protected override MemberInfo GetUpdatedMe(MemberInfo me) {

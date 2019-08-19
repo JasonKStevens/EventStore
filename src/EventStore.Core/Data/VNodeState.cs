@@ -11,7 +11,9 @@ namespace EventStore.Core.Data {
 		Manager,
 		ShuttingDown,
 		Shutdown,
-		ReadOnlyReplica
+		ReadOnlyUnknown,
+		ReadOnlyPreReplica,
+		ReadOnlyReplica,
 	}
 
 	public static class VNodeStateExtensions {
@@ -20,6 +22,11 @@ namespace EventStore.Core.Data {
 			       || state == VNodeState.Clone
 			       || state == VNodeState.Slave
 				   || state == VNodeState.ReadOnlyReplica;
+		}
+		public static bool IsReadOnly(this VNodeState state) {
+			return state == VNodeState.ReadOnlyUnknown
+					|| state == VNodeState.ReadOnlyPreReplica
+					|| state == VNodeState.ReadOnlyReplica;
 		}
 	}
 }

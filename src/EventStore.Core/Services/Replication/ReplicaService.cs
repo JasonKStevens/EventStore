@@ -88,6 +88,7 @@ namespace EventStore.Core.Services.Replication {
 			switch (message.State) {
 				case VNodeState.Initializing:
 				case VNodeState.Unknown:
+				case VNodeState.ReadOnlyUnknown:
 				case VNodeState.PreMaster:
 				case VNodeState.Master:
 				case VNodeState.ShuttingDown:
@@ -97,6 +98,11 @@ namespace EventStore.Core.Services.Replication {
 				}
 				case VNodeState.PreReplica: {
 					var m = (SystemMessage.BecomePreReplica)message;
+					ConnectToMaster(m.Master);
+					break;
+				}
+				case VNodeState.ReadOnlyPreReplica: {
+					var m = (SystemMessage.BecomeReadOnlyPreReplica)message;
 					ConnectToMaster(m.Master);
 					break;
 				}
@@ -169,9 +175,9 @@ namespace EventStore.Core.Services.Replication {
 		}
 
 		public void Handle(ReplicationMessage.SubscribeToMaster message) {
-			if (_state != VNodeState.PreReplica)
-				throw new Exception(string.Format("_state is {0}, but is expected to be {1}", _state,
-					VNodeState.PreReplica));
+			if (_state != VNodeState.PreReplica && _state != VNodeState.ReadOnlyPreReplica)
+				throw new Exception(string.Format("_state is {0}, but is expected to be {1} or {2}", _state,
+					VNodeState.PreReplica, VNodeState.ReadOnlyPreReplica));
 
 			var logPosition = _db.Config.WriterCheckpoint.ReadNonFlushed();
 			var epochs = _epochManager.GetLastEpochs(ClusterConsts.SubscriptionLastEpochCount).ToArray();
@@ -219,7 +225,11 @@ namespace EventStore.Core.Services.Replication {
 						SendTcpMessage(_connection, message.Message);
 					break;
 				}
-
+				case VNodeState.ReadOnlyPreReplica: {
+					if (_connection != null)
+						SendTcpMessage(_connection, message.Message);
+					break;
+				}
 				case VNodeState.CatchingUp:
 				case VNodeState.Clone:
 				case VNodeState.Slave:

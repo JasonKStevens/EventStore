@@ -173,7 +173,6 @@ namespace EventStore.Core.Messages {
 				Master = master;
 			}
 		}
-
 		public class BecomePreReplica : ReplicaStateMessage {
 			private static readonly int TypeId = Interlocked.Increment(ref NextMsgId);
 
@@ -209,17 +208,6 @@ namespace EventStore.Core.Messages {
 			}
 		}
 
-		public class BecomeReadOnlyReplica : ReplicaStateMessage {
-			private static readonly int TypeId = Interlocked.Increment(ref NextMsgId);
-
-			public override int MsgTypeId {
-				get { return TypeId; }
-			}
-
-			public BecomeReadOnlyReplica(Guid correlationId, VNodeInfo master) : base(correlationId, VNodeState.ReadOnlyReplica, master) {
-			}
-		}
-
 		public class BecomeSlave : ReplicaStateMessage {
 			private static readonly int TypeId = Interlocked.Increment(ref NextMsgId);
 
@@ -230,6 +218,43 @@ namespace EventStore.Core.Messages {
 			public BecomeSlave(Guid correlationId, VNodeInfo master) : base(correlationId, VNodeState.Slave, master) {
 			}
 		}
+
+		public class BecomeReadOnlyUnknown : StateChangeMessage {
+			private static readonly int TypeId = Interlocked.Increment(ref NextMsgId);
+
+			public override int MsgTypeId {
+				get { return TypeId; }
+			}
+
+			public BecomeReadOnlyUnknown (Guid correlationId)
+				: base(correlationId, VNodeState.ReadOnlyUnknown) {
+			}
+		}
+
+		public class BecomeReadOnlyPreReplica : ReplicaStateMessage {
+			private static readonly int TypeId = Interlocked.Increment(ref NextMsgId);
+
+			public override int MsgTypeId {
+				get { return TypeId; }
+			}
+
+			public BecomeReadOnlyPreReplica(Guid correlationId, VNodeInfo master)
+				: base(correlationId, VNodeState.ReadOnlyPreReplica, master) {
+			}
+		}
+
+		public class BecomeReadOnlyReplica : ReplicaStateMessage {
+			private static readonly int TypeId = Interlocked.Increment(ref NextMsgId);
+
+			public override int MsgTypeId {
+				get { return TypeId; }
+			}
+
+			public BecomeReadOnlyReplica(Guid correlationId, VNodeInfo master)
+				: base(correlationId, VNodeState.ReadOnlyReplica, master) {
+			}
+		}
+
 
 		public class ServiceShutdown : Message {
 			private static readonly int TypeId = Interlocked.Increment(ref NextMsgId);

@@ -45,6 +45,7 @@ namespace EventStore.Core.Services {
 				case VNodeState.CatchingUp:
 				case VNodeState.Clone:
 				case VNodeState.Slave:
+				case VNodeState.ReadOnlyPreReplica:
 				case VNodeState.ReadOnlyReplica:
 					_masterInfo = ((SystemMessage.ReplicaStateMessage)message).Master;
 					break;
@@ -55,6 +56,7 @@ namespace EventStore.Core.Services {
 				case VNodeState.Manager:
 				case VNodeState.ShuttingDown:
 				case VNodeState.Shutdown:
+				case VNodeState.ReadOnlyUnknown:
 					_masterInfo = null;
 					break;
 				default:

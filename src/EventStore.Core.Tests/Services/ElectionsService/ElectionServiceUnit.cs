@@ -74,7 +74,7 @@ namespace EventStore.Core.Tests.Services.ElectionsService {
 						LastCommitPosition, WriterCheckpoint, ChaserCheckpoint,
 						-1,
 						-1,
-						Guid.Empty, 0, clusterSettings.Self.NodeInfo.IsReadOnlyReplica)
+						Guid.Empty, 0)
 				})
 				.Union(clusterSettings.GroupMembers
 					.Select(x => MemberInfo.ForVNode(x.NodeInfo.InstanceId,
@@ -90,7 +90,7 @@ namespace EventStore.Core.Tests.Services.ElectionsService {
 						LastCommitPosition, WriterCheckpoint, ChaserCheckpoint,
 						-1,
 						-1,
-						Guid.Empty, 0, x.NodeInfo.IsReadOnlyReplica)));
+						Guid.Empty, 0)));
 
 			var ordered = members.OrderBy(x =>
 				string.Format("{0}:{1}", x.InternalHttpEndPoint.ToString(), x.InternalHttpEndPoint.Port));
@@ -174,7 +174,7 @@ namespace EventStore.Core.Tests.Services.ElectionsService {
 						x.ExternalTcpEndPoint, x.ExternalSecureTcpEndPoint,
 						x.InternalHttpEndPoint, x.ExternalHttpEndPoint,
 						x.LastCommitPosition, x.WriterCheckpoint, x.ChaserCheckpoint,
-						x.EpochPosition, x.EpochNumber, x.EpochId, x.NodePriority, x.IsReadOnlyReplica));
+						x.EpochPosition, x.EpochNumber, x.EpochId, x.NodePriority));
 		}
 
 		public IEnumerable<MemberInfo> ListAliveMembers(Func<MemberInfo, bool> predicate = null) {
