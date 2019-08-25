@@ -1,8 +1,8 @@
-# Event Store
+# Rx for Event Store
 
-This is an experimental fork of [EventStore](https://github.com/EventStore/EventStore) which includes support for Reactive Extension (Rx) linq queries via an IQbservableProvider.
+This is an experimental fork of [EventStore](https://github.com/EventStore/EventStore) to support a Reactive Extension (Rx) client.  This allows linq queries on the client to be executed inside of EventStore via an IQbservableProvider.
 
-There's an [Rx client](https://github.com/JasonKStevens/QbservableProvider) for this, although I haven't pushed the latest changes yet. This should hopefully be in the next week or so (just a bit of tidy up required after a spike).
+The [client](https://github.com/JasonKStevens/QbservableProvider) for this will be updated shortly and probable merged in here for convenience. This should hopefully be in the next week or so (just a bit of tidy up required after a spike).
 
 ```c#
 var options = new StreamDbContextOptionsBuilder()
