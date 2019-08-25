@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net471</TargetFramework>
+    <Platform>x64</Platform>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <OutputPath>C:\Dev\PuzzleBox\EventStore\src\..\bin\Debug\EventStore.Transport.Grpc\net471\</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.9.1" />
+    <PackageReference Include="Grpc.Core" Version="2.23.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.23.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    <PackageReference Include="Serialize.Linq" Version="1.8.1" />
+    <PackageReference Include="System.Reactive" Version="4.1.6" />
+    <ProjectReference Include="..\EventStore.BufferManagement\EventStore.BufferManagement.csproj" />
+    <ProjectReference Include="..\EventStore.Common\EventStore.Common.csproj" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="StreamService.proto" />
+  </ItemGroup>
+</Project>

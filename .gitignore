@@ -2,6 +2,7 @@ TestResult.xml
 /testResults
 *.nupkg
 /packages
+packages
 /Logs
 /Data
 /Data-logs

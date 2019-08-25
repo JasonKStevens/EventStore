@@ -4,6 +4,6 @@
 		<DebugType Condition=" '$(Configuration)' == 'Debug' ">full</DebugType>
 		<DebugType Condition=" '$(Configuration)' == 'Release' ">pdbonly</DebugType>
 		<OutputPath>$(MSBuildThisFileDirectory)..\bin\$(Configuration)\$(MSBuildProjectName)\</OutputPath>
-		<IntermediateOutputPath>$(MSBuildThisFileDirectory)\..\obj\$(Configuration)\$(MSBuildProjectName)\</IntermediateOutputPath>
+		<IntermediateOutputPath>$(MSBuildThisFileDirectory)..\obj\$(Configuration)\$(MSBuildProjectName)\</IntermediateOutputPath>
 	</PropertyGroup>
 </Project>

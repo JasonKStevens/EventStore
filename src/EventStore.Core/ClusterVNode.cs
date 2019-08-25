@@ -38,6 +38,7 @@ using EventStore.Core.Services.PersistentSubscription.ConsumerStrategy;
 using System.Threading.Tasks;
 using System.Collections;
 using System.Diagnostics;
+using EventStore.Core.Services.Transport.Grpc;
 
 namespace EventStore.Core {
 	public class ClusterVNode :
@@ -284,6 +285,14 @@ namespace EventStore.Core {
 					_workersHandler, _workerBuses);
 
 			Ensure.NotNull(_internalAuthenticationProvider, "authenticationProvider");
+
+			{
+				// gRpc service for Rx
+				var gRpcService = new GrpcService(_mainQueue, host: "127.0.0.1", port: 5001);
+				_mainBus.Subscribe<SystemMessage.SystemInit>(gRpcService);
+				_mainBus.Subscribe<SystemMessage.SystemStart>(gRpcService);
+				_mainBus.Subscribe<SystemMessage.BecomeShuttingDown>(gRpcService);
+			}
 
 			{
 				// EXTERNAL TCP
