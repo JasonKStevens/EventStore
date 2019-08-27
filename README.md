@@ -1,6 +1,6 @@
 # Rx for Event Store
 
-This is an experimental fork of [EventStore](https://github.com/EventStore/EventStore) support a Reactive Extension (Rx).
+This is an experimental fork of [EventStore](https://github.com/EventStore/EventStore) to support Reactive Extensions (Rx).
 
 [Qube](https://github.com/JasonKStevens/Qube) allows linq queries to be written on the client, executed inside of EventStore and the results streamed back via [gRpc](https://grpc.io/).
 
