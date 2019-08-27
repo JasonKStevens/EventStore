@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using EventStore.Common.Log;
@@ -13,7 +15,7 @@ using EventStore.Core.Services.UserManagement;
 using EventStore.Transport.Grpc;
 using EventStore.Transport.Grpc.Utils;
 using Grpc.Core;
-using QbservableProvider.EventStore;
+using Qube.EventStore;
 
 namespace EventStore.Core.Services.Transport.Grpc {
 	public class RxStreamService : StreamService.StreamServiceBase {
@@ -56,25 +58,30 @@ namespace EventStore.Core.Services.Transport.Grpc {
 			) {
 				GetNextBatch(position);
 
-				// Waiting for completion this way is unfortunate but gRpc seems to have an issue running
-				// inside of other thread via Task.Run or qbservable.RunAsync(): 'Response stream is already completed'
+				// Waiting for completion this way isn't ideal but gRpc has an issue running inside
+				// another thread via Task.Run or qbservable.RunAsync(): 'Response stream is already completed'
 				while (!done) {
 					await Task.Delay(25);
 				}
 			}
 		}
 
-		private async Task<IQbservable<GrpcEvent>> BuildQbservableAsync(
+		private async Task<IQbservable<object>> BuildQbservableAsync(
 			string serializedRxQuery,
 			Subject<GrpcEvent> subject,
-			IServerStreamWriter<EventEnvelope> responseStream) {
+			IServerStreamWriter<EventEnvelope> responseStream
+		) {
 			try {
 				var expression = SerializationHelper.DeserializeLinqExpression(serializedRxQuery);
-				var lambdaExpr = (LambdaExpression)expression;
-				var lambda = lambdaExpr.Compile();
+				var lambdaExpression = (LambdaExpression)expression;
 
-				var qbservable = (IQbservable<GrpcEvent>)lambda.DynamicInvoke(subject.AsQbservable());
-				return qbservable;
+				var castLambdaExpression = CastGenericItemToObject(lambdaExpression);
+
+				var qbservable = castLambdaExpression
+					.Compile()
+					.DynamicInvoke(subject.AsQbservable());
+
+				return (IQbservable<object>) qbservable;
 			} catch (Exception ex) {
 				Log.ErrorException(ex, "Error deserializing Qbservable query");
 				await SendErrorToClient(responseStream, "Unsupported linq expression: " + ex.Message);
@@ -82,11 +89,27 @@ namespace EventStore.Core.Services.Transport.Grpc {
 			}
 		}
 
+		/// <summary>
+		/// Call .Cast<object>() Rx querie's lambda expression to cast result type to "known" object.
+		/// </summary>
+		private static LambdaExpression CastGenericItemToObject(LambdaExpression lambdaExpression) {
+			var castMethod = typeof(Qbservable)
+				.GetMethods(BindingFlags.Static | BindingFlags.Public)
+				.Where(mi => mi.Name == "Cast")
+				.Single()
+				.MakeGenericMethod(typeof(object));
+
+			var methodCall = Expression.Call(null, castMethod, lambdaExpression.Body);
+			var castLambdaExpression = Expression.Lambda(methodCall, lambdaExpression.Parameters);
+
+			return castLambdaExpression;
+		}
+
 		private async Task SendNextToClient(
 			IServerStreamWriter<EventEnvelope> responseStream,
-			GrpcEvent grpcEvent
+			object item
 		) {
-			var eventEnvelope = SerializationHelper.Pack(grpcEvent);
+			var eventEnvelope = SerializationHelper.Pack(item);
 			await SendEnvelopeToClient(responseStream, eventEnvelope);
 		}
 

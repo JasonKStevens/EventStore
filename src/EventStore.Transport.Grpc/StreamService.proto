@@ -1,5 +1,5 @@
 syntax = "proto3";
-option csharp_namespace = "QbservableProvider.EventStore";
+option csharp_namespace = "Qube.EventStore";
 
 package Greet;
 
@@ -9,8 +9,6 @@ service StreamService {
 
 message QueryEnvelope {
   string payload = 1;
-  string typeIn = 2;
-  string typeOut = 3;
 }
 
 message EventEnvelope {

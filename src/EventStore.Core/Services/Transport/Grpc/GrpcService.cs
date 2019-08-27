@@ -3,7 +3,7 @@ using EventStore.Common.Log;
 using EventStore.Core.Bus;
 using EventStore.Core.Messages;
 using Grpc.Core;
-using QbservableProvider.EventStore;
+using Qube.EventStore;
 
 namespace EventStore.Core.Services.Transport.Grpc {
 	public class GrpcService :

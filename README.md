@@ -1,28 +1,35 @@
 # Rx for Event Store
 
-This is an experimental fork of [EventStore](https://github.com/EventStore/EventStore) to support a Reactive Extension (Rx) client.  This allows linq queries on the client to be executed inside of EventStore via an IQbservableProvider.
+This is an experimental fork of [EventStore](https://github.com/EventStore/EventStore) support a Reactive Extension (Rx).
 
-The [client](https://github.com/JasonKStevens/QbservableProvider) for this will be updated shortly and probable merged in here for convenience. This should hopefully be in the next week or so (just a bit of tidy up required after a spike).
+[Qube](https://github.com/JasonKStevens/Qube) allows linq queries to be written on the client, executed inside of EventStore and the results streamed back via [gRpc](https://grpc.io/).
 
 ```c#
 var options = new StreamDbContextOptionsBuilder()
-    .UseEventStore("127.0.0.1:5001")  // TODO: support ES connection string format
+    .UseEventStore("127.0.0.1:5001")
     .Options;
 
 new EventStoreContext(options)
     .FromAll()
     .Where(e => e.EventType == "CustomerCreatedEvent")
-    .Where(e => new DateTime(2018, 10, 1) <= e.Created && e.Created < new DateTime(2018, 11, 1))
-    .Where(e => e.Data.Contains(".test@somewhere.co.nz"))
+    .Where(e => new DateTime(2018, 3, 1) <= e.Created)
+    .TakeWhile(e => e.Created < new DateTime(2018, 4, 1))
+    .Select(e => e.Data)
     .Subscribe(
         onNext: s =>
         {
-            var @event = JsonConvert.DeserializeObject<CustomerCreatedEvent>(s.Data);
+            var @event = JsonConvert.DeserializeObject<CustomerCreatedEvent>(s);
             Console.WriteLine($"{@event.CustomerId}: {@event.Email}");
-                },
+        },
         onError: e => Console.WriteLine("ERROR: " + e),
         onCompleted: () => Console.WriteLine("DONE")
     );
 ```
 
-The outstanding piece for this version is to support multiple subscriber types.
+## Getting Started
+
+1. Clone, build and run this fork of EventStore
+2. Set up some test events
+3. Clone Qube
+4. Edit Qube.EventStore.Client.Program and write your Rx query
+5. Build and run Qube.EventStore.Client

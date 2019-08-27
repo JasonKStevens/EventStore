@@ -1,5 +1,5 @@
 ﻿using Newtonsoft.Json;
-using QbservableProvider.EventStore;
+using Qube.EventStore;
 using Serialize.Linq.Serializers;
 using System;
 using System.Linq.Expressions;
@@ -46,7 +46,7 @@ namespace EventStore.Transport.Grpc.Utils
             return expression;
         }
 
-        public static EventEnvelope Pack(GrpcEvent payload)
+        public static EventEnvelope Pack(object payload)
         {
             return new EventEnvelope
             {
