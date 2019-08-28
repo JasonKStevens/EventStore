@@ -33,3 +33,7 @@ new EventStoreContext(options)
 3. Clone Qube
 4. Edit Qube.EventStore.Client.Program and write your Rx query
 5. Build and run Qube.EventStore.Client
+
+## The Plan
+
+See the [Qube](https://github.com/JasonKStevens/Qube) project for a rough list of intended features.
