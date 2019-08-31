@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Linq;
-using System.Linq.Expressions;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using EventStore.Common.Log;
@@ -12,10 +9,12 @@ using EventStore.Core.Data;
 using EventStore.Core.Messages;
 using EventStore.Core.Messaging;
 using EventStore.Core.Services.UserManagement;
-using EventStore.Transport.Grpc;
-using EventStore.Transport.Grpc.Utils;
 using Grpc.Core;
-using Qube.EventStore;
+using QbservableProvider.Core;
+using Qube.Core;
+using Qube.Grpc;
+using Event = Qube.EventStore.Event;
+using Qube.Grpc.Utils;
 
 namespace EventStore.Core.Services.Transport.Grpc {
 	public class RxStreamService : StreamService.StreamServiceBase {
@@ -30,13 +29,17 @@ namespace EventStore.Core.Services.Transport.Grpc {
 
 		public override async Task QueryStreamAsync(
 			QueryEnvelope queryEnvelope,
-			IServerStreamWriter<EventEnvelope> responseStream,
+			IServerStreamWriter<ResponseEnvelope> responseStream,
 			ServerCallContext context
 		) {
-			var subject = new Subject<GrpcEvent>();
-			var qbservable = await BuildQbservableAsync(queryEnvelope.Payload, subject, responseStream);
+			var subject = new Subject<Event>();
+			ServerQueryObservable<Event, object> qbservable;
 
-			if (qbservable == null) {
+			try {
+				qbservable = BuildQbservable(queryEnvelope, subject);
+			} catch (Exception ex) {
+				Log.ErrorException(ex, "Error building qbservable");
+				await ClientOnError(responseStream, ex);
 				return;
 			}
 
@@ -52,9 +55,9 @@ namespace EventStore.Core.Services.Transport.Grpc {
 			}
 
 			using (var sub = qbservable.Subscribe(
-				async e => { await SendNextToClient(responseStream, e); },
-				async ex => { await SendErrorToClient(responseStream, ex.Message); done = true; },
-				() => { /* No need to send completed to client */ done = true; })
+				async e => { await ClientOnNext(responseStream, e); },
+				async ex => { await ClientOnError(responseStream, ex); done = true; },
+				async () => { await ClientOnCompleted(responseStream); done = true; })
 			) {
 				GetNextBatch(position);
 
@@ -66,67 +69,45 @@ namespace EventStore.Core.Services.Transport.Grpc {
 			}
 		}
 
-		private async Task<IQbservable<object>> BuildQbservableAsync(
-			string serializedRxQuery,
-			Subject<GrpcEvent> subject,
-			IServerStreamWriter<EventEnvelope> responseStream
+		private static ServerQueryObservable<Event, object> BuildQbservable(QueryEnvelope queryEnvelope, Subject<Event> subject) {
+			var queryExpression = SerializationHelper.DeserializeLinqExpression(queryEnvelope.Payload);
+			var qbservable = new ServerQueryObservable<Event, object>(subject.AsQbservable(), queryExpression);
+			return qbservable;
+		}
+
+		private async Task ClientOnNext(
+			IServerStreamWriter<ResponseEnvelope> responseStream,
+			object payload
 		) {
-			try {
-				var expression = SerializationHelper.DeserializeLinqExpression(serializedRxQuery);
-				var lambdaExpression = (LambdaExpression)expression;
-
-				var castLambdaExpression = CastGenericItemToObject(lambdaExpression);
-
-				var qbservable = castLambdaExpression
-					.Compile()
-					.DynamicInvoke(subject.AsQbservable());
-
-				return (IQbservable<object>) qbservable;
-			} catch (Exception ex) {
-				Log.ErrorException(ex, "Error deserializing Qbservable query");
-				await SendErrorToClient(responseStream, "Unsupported linq expression: " + ex.Message);
-				return null;
-			}
+			await SendEnvelopeToClient(responseStream, new ResponseEnvelope {
+				Payload = EnvelopeHelper.Pack(payload),
+				ResponseType = ResponseEnvelope.Types.ResponseType.Next
+			});
 		}
 
-		/// <summary>
-		/// Call .Cast<object>() Rx querie's lambda expression to cast result type to "known" object.
-		/// </summary>
-		private static LambdaExpression CastGenericItemToObject(LambdaExpression lambdaExpression) {
-			var castMethod = typeof(Qbservable)
-				.GetMethods(BindingFlags.Static | BindingFlags.Public)
-				.Where(mi => mi.Name == "Cast")
-				.Single()
-				.MakeGenericMethod(typeof(object));
-
-			var methodCall = Expression.Call(null, castMethod, lambdaExpression.Body);
-			var castLambdaExpression = Expression.Lambda(methodCall, lambdaExpression.Parameters);
-
-			return castLambdaExpression;
-		}
-
-		private async Task SendNextToClient(
-			IServerStreamWriter<EventEnvelope> responseStream,
-			object item
+		private async Task ClientOnError(
+			IServerStreamWriter<ResponseEnvelope> responseStream,
+			Exception ex
 		) {
-			var eventEnvelope = SerializationHelper.Pack(item);
-			await SendEnvelopeToClient(responseStream, eventEnvelope);
+			await SendEnvelopeToClient(responseStream, new ResponseEnvelope {
+				Payload = EnvelopeHelper.Pack(ex),
+				ResponseType = ResponseEnvelope.Types.ResponseType.Error
+			});
 		}
 
-		private async Task SendErrorToClient(
-			IServerStreamWriter<EventEnvelope> responseStream,
-			string errorMessage
-		) {
-			var eventEnvelope = new EventEnvelope { Error = errorMessage };
-			await SendEnvelopeToClient(responseStream, eventEnvelope);
+		private async Task ClientOnCompleted(IServerStreamWriter<ResponseEnvelope> responseStream) {
+			await SendEnvelopeToClient(responseStream, new ResponseEnvelope {
+				Payload = "",
+				ResponseType = ResponseEnvelope.Types.ResponseType.Completed
+			});
 		}
 
-		private async Task SendEnvelopeToClient(IServerStreamWriter<EventEnvelope> responseStream, EventEnvelope eventEnvelope) {
-			// TODO: Consider using a buffer - only one write can be pending at a time.
+		private async Task SendEnvelopeToClient(IServerStreamWriter<ResponseEnvelope> responseStream, ResponseEnvelope ResponseEnvelope) {
+			// gRpc - only one write can be pending at a time.
 			await _writeLock.WaitAsync();
 
 			try {
-				await responseStream.WriteAsync(eventEnvelope);
+				await responseStream.WriteAsync(ResponseEnvelope);
 			} catch (Exception ex) {
 				Log.ErrorException(ex, "Error writing to gRpc response stream");
 			} finally {

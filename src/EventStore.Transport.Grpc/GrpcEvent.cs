@@ -2,7 +2,8 @@
 
 namespace EventStore.Transport.Grpc {
 	/// <summary>
-	/// Dto to send back to client
+	/// Representation of the event record that the client qbservable sees
+	/// and queries over.
 	/// </summary>
 	public class GrpcEvent {
 		/// <summary>

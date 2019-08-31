@@ -1,19 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reactive.Subjects;
 using System.Text;
+using System.Reactive.Subjects;
 using EventStore.Core.Data;
 using EventStore.Core.Messaging;
-using EventStore.Transport.Grpc;
 using static EventStore.Core.Messages.ClientMessage;
+using Event = Qube.EventStore.Event;
 
 namespace EventStore.Core.Services.Transport.Grpc {
 	public class RxSubjectEnvelope : IEnvelope {
-		private readonly Subject<GrpcEvent> _subject;
+		private readonly Subject<Event> _subject;
 		private readonly Action<TFPos> _getNextBatch;
 		private readonly Dictionary<Type, Action<object>> _messageHandlers;
 
-		public RxSubjectEnvelope(Subject<GrpcEvent> subject, Action<TFPos> nextBatch) {
+		public RxSubjectEnvelope(Subject<Event> subject, Action<TFPos> nextBatch) {
 			_subject = subject;
 			_getNextBatch = nextBatch;
 
@@ -30,8 +30,8 @@ namespace EventStore.Core.Services.Transport.Grpc {
 
 		private void OnMessage(ReadAllEventsForwardCompleted message) {
 			foreach (var recordedEvent in message.Events) {
-				var grpcEvent = ToEventData(recordedEvent.OriginalEvent);
-				_subject.OnNext(grpcEvent);
+				var Event = ToEventData(recordedEvent.OriginalEvent);
+				_subject.OnNext(Event);
 			}
 
 			if (message.IsEndOfStream) {
@@ -43,9 +43,9 @@ namespace EventStore.Core.Services.Transport.Grpc {
 			}
 		}
 
-		private GrpcEvent ToEventData(EventRecord @event) {
+		private Event ToEventData(EventRecord @event) {
 
-			return new GrpcEvent {
+			return new Qube.EventStore.Event {
 				EventStreamId = @event.EventStreamId,
 				EventId = @event.EventId,
 				EventNumber = @event.EventNumber,
