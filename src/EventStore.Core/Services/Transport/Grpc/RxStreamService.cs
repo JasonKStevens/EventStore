@@ -10,11 +10,12 @@ using EventStore.Core.Messages;
 using EventStore.Core.Messaging;
 using EventStore.Core.Services.UserManagement;
 using Grpc.Core;
-using QbservableProvider.Core;
 using Qube.Core;
 using Qube.Grpc;
 using Event = Qube.EventStore.Event;
 using Qube.Grpc.Utils;
+using Newtonsoft.Json;
+using Qube.Core.Utils;
 
 namespace EventStore.Core.Services.Transport.Grpc {
 	public class RxStreamService : StreamService.StreamServiceBase {
@@ -30,13 +31,18 @@ namespace EventStore.Core.Services.Transport.Grpc {
 		public override async Task QueryStreamAsync(
 			QueryEnvelope queryEnvelope,
 			IServerStreamWriter<ResponseEnvelope> responseStream,
-			ServerCallContext context
+			ServerCallContext callContext
 		) {
-			var subject = new Subject<Event>();
-			ServerQueryObservable<Event, object> qbservable;
+			var subject = new Subject<object>();
+			ServerQueryObservable<object> qbservable;
+			Type sourceType;
 
 			try {
-				qbservable = BuildQbservable(queryEnvelope, subject);
+				var classDefinition = JsonConvert.DeserializeObject<PortableTypeDefinition>(queryEnvelope.ClassDefinition);
+				sourceType = new PortableTypeBuilder().BuildType(classDefinition);
+
+				var queryExpression = SerializationHelper.DeserializeLinqExpression(queryEnvelope.Payload);
+				qbservable = new ServerQueryObservable<object>(sourceType, subject.AsQbservable(), queryExpression);
 			} catch (Exception ex) {
 				Log.ErrorException(ex, "Error building qbservable");
 				await ClientOnError(responseStream, ex);
@@ -49,30 +55,25 @@ namespace EventStore.Core.Services.Transport.Grpc {
 			RxSubjectEnvelope envelope = null;
 
 			void GetNextBatch(TFPos pos) {
-				envelope = envelope ?? new RxSubjectEnvelope(subject, GetNextBatch);
+				envelope = envelope ?? new RxSubjectEnvelope(sourceType, subject, GetNextBatch);
 				var message = BuildMessage(operationId, envelope, pos);
 				_publisher.Publish(message);
 			}
 
 			using (var sub = qbservable.Subscribe(
-				async e => { await ClientOnNext(responseStream, e); },
+				async e => await ClientOnNext(responseStream, e),
 				async ex => { await ClientOnError(responseStream, ex); done = true; },
 				async () => { await ClientOnCompleted(responseStream); done = true; })
 			) {
 				GetNextBatch(position);
 
-				// Waiting for completion this way isn't ideal but gRpc has an issue running inside
+				// TODO: Investiate the following
+				// Waiting for completion this way isn't good but gRpc has an issue running inside
 				// another thread via Task.Run or qbservable.RunAsync(): 'Response stream is already completed'
 				while (!done) {
 					await Task.Delay(25);
 				}
 			}
-		}
-
-		private static ServerQueryObservable<Event, object> BuildQbservable(QueryEnvelope queryEnvelope, Subject<Event> subject) {
-			var queryExpression = SerializationHelper.DeserializeLinqExpression(queryEnvelope.Payload);
-			var qbservable = new ServerQueryObservable<Event, object>(subject.AsQbservable(), queryExpression);
-			return qbservable;
 		}
 
 		private async Task ClientOnNext(
