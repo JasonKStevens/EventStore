@@ -1,6 +1,6 @@
 ﻿using System;
+using System.Reactive;
 using System.Reactive.Linq;
-using System.Reactive.Subjects;
 using System.Threading;
 using System.Threading.Tasks;
 using EventStore.Common.Log;
@@ -10,12 +10,9 @@ using EventStore.Core.Messages;
 using EventStore.Core.Messaging;
 using EventStore.Core.Services.UserManagement;
 using Grpc.Core;
-using Qube.Core;
-using Qube.Grpc;
-using Event = Qube.EventStore.Event;
-using Qube.Grpc.Utils;
 using Newtonsoft.Json;
-using Qube.Core.Utils;
+using Qube.Grpc;
+using Qube.Grpc.Utils;
 
 namespace EventStore.Core.Services.Transport.Grpc {
 	public class RxStreamService : StreamService.StreamServiceBase {
@@ -33,21 +30,18 @@ namespace EventStore.Core.Services.Transport.Grpc {
 			IServerStreamWriter<ResponseEnvelope> responseStream,
 			ServerCallContext callContext
 		) {
-			var subject = new Subject<object>();
-			ServerQueryObservable<object> qbservable;
-			Type sourceType;
+			var streamPatterns = JsonConvert.DeserializeObject<string[]>(queryEnvelope.StreamPattern);
 
 			try {
-				var classDefinition = JsonConvert.DeserializeObject<PortableTypeDefinition>(queryEnvelope.ClassDefinition);
-				sourceType = new PortableTypeBuilder().BuildType(classDefinition);
-
-				var queryExpression = SerializationHelper.DeserializeLinqExpression(queryEnvelope.Payload);
-				qbservable = new ServerQueryObservable<object>(sourceType, subject.AsQbservable(), queryExpression);
+				var broker = new GrpcBroker(queryEnvelope);
+				await Run(broker, responseStream, streamPatterns);
 			} catch (Exception ex) {
-				Log.ErrorException(ex, "Error building qbservable");
+				Log.ErrorException(ex, "Error running Rx query");
 				await ClientOnError(responseStream, ex);
-				return;
 			}
+		}
+
+		private async Task Run(GrpcBroker broker, IServerStreamWriter<ResponseEnvelope> responseStream, string[] streamPatterns) {
 
 			var done = false;
 			var position = new TFPos();
@@ -55,13 +49,18 @@ namespace EventStore.Core.Services.Transport.Grpc {
 			RxSubjectEnvelope envelope = null;
 
 			void GetNextBatch(TFPos pos) {
-				envelope = envelope ?? new RxSubjectEnvelope(sourceType, subject, GetNextBatch);
+				envelope = envelope ?? new RxSubjectEnvelope(
+					broker.SourceType,
+					broker.RegisteredTypes,
+					broker.Observer,
+					streamPatterns,
+					GetNextBatch);
 				var message = BuildMessage(operationId, envelope, pos);
 				_publisher.Publish(message);
 			}
 
-			using (var sub = qbservable.Subscribe(
-				async e => await ClientOnNext(responseStream, e),
+			using (var sub = broker.Observable.Subscribe(
+				async e => { try { await ClientOnNext(responseStream, e); } catch { done = true; } },
 				async ex => { await ClientOnError(responseStream, ex); done = true; },
 				async () => { await ClientOnCompleted(responseStream); done = true; })
 			) {
@@ -82,7 +81,8 @@ namespace EventStore.Core.Services.Transport.Grpc {
 		) {
 			await SendEnvelopeToClient(responseStream, new ResponseEnvelope {
 				Payload = EnvelopeHelper.Pack(payload),
-				ResponseType = ResponseEnvelope.Types.ResponseType.Next
+				PayloadType = payload.GetType().FullName,
+				RxMethod = ResponseEnvelope.Types.RxMethod.Next
 			});
 		}
 
@@ -92,25 +92,28 @@ namespace EventStore.Core.Services.Transport.Grpc {
 		) {
 			await SendEnvelopeToClient(responseStream, new ResponseEnvelope {
 				Payload = EnvelopeHelper.Pack(ex),
-				ResponseType = ResponseEnvelope.Types.ResponseType.Error
+				PayloadType = ex.GetType().FullName,
+				RxMethod = ResponseEnvelope.Types.RxMethod.Error
 			});
 		}
 
 		private async Task ClientOnCompleted(IServerStreamWriter<ResponseEnvelope> responseStream) {
 			await SendEnvelopeToClient(responseStream, new ResponseEnvelope {
 				Payload = "",
-				ResponseType = ResponseEnvelope.Types.ResponseType.Completed
+				PayloadType = "",
+				RxMethod = ResponseEnvelope.Types.RxMethod.Completed
 			});
 		}
 
-		private async Task SendEnvelopeToClient(IServerStreamWriter<ResponseEnvelope> responseStream, ResponseEnvelope ResponseEnvelope) {
+		private async Task SendEnvelopeToClient(IServerStreamWriter<ResponseEnvelope> responseStream, ResponseEnvelope responseEnvelope) {
 			// gRpc - only one write can be pending at a time.
 			await _writeLock.WaitAsync();
 
 			try {
-				await responseStream.WriteAsync(ResponseEnvelope);
+				await responseStream.WriteAsync(responseEnvelope);
 			} catch (Exception ex) {
 				Log.ErrorException(ex, "Error writing to gRpc response stream");
+				throw;
 			} finally {
 				_writeLock.Release();
 			}
